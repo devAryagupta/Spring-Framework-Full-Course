@@ -2,16 +2,14 @@ package in.strikes;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.core.annotation.Order;
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
     public static void main(String[] args) {
+        // THEORY (§1): AppConfig is registered HERE (not via @ComponentScan).
+        // See: Lecture 06/How-AppConfig-Gets-Registered.md
         ApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
 
         OrderService order = context.getBean(OrderService.class);
-
         OrderService order2 = context.getBean(OrderService.class);
 
         //OrderService order3 = new OrderService();

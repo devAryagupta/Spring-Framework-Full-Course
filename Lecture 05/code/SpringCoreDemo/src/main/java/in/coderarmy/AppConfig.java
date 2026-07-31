@@ -63,6 +63,9 @@ public class AppConfig {
         return new CartService();
     }
 
+    // Two beans of the SAME type (PaymentService) → Spring cannot guess which
+    // one to inject unless you distinguish them (@Qualifier / @Primary).
+    // This is exactly the ambiguity problem @Autowired also faces.
     @Bean
     @Qualifier("cp")
     public PaymentService createCardPayment() {
@@ -75,6 +78,24 @@ public class AppConfig {
         return new UpiPayment();
     }
 
+    // =========================================================
+    // @Bean method parameters ≈ same idea as @Autowired
+    // =========================================================
+    // Spring sees: createOrderService needs a PaymentService argument.
+    // It AUTO-WIRES that argument from the container (find bean by type).
+    // Because TWO PaymentService beans exist (cp + upi), we add
+    // @Qualifier("cp") so Spring injects CardPayment, not UpiPayment.
+    //
+    // Flow:
+    //   1) Spring creates PaymentService beans (createCardPayment / createUpiPayment)
+    //   2) Spring calls createOrderService(...)
+    //   3) It looks up the bean named/qualified "cp" and passes it in
+    //   4) We return new OrderService(paymentService) — DI is done
+    //
+    // If OrderService were a @Component instead of this @Bean method,
+    // you would put @Autowired (+ @Qualifier) on OrderService's
+    // constructor / field / setter. See notes in OrderService.java.
+    // =========================================================
     @Bean
     public OrderService createOrderService(@Qualifier("cp") PaymentService paymentService) {
         return new OrderService(paymentService);
