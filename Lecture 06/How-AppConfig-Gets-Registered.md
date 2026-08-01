@@ -9,6 +9,7 @@ Use this file while revising. Each topic points to the demo code where the same 
 | How to solve circular dependency | §3 | `CircularDependencyDemo` (`simple/A`, `simple/B`, `OrderService`, `PaymentService`, `Main`) |
 | Field vs Constructor injection | §4 | `CircularDependencyDemo` + `BeanInitializationDemo` |
 | Does constructor injection break SRP? | §5 | Comments in `OrderService` / `PaymentService` |
+| Singleton vs Prototype, Eager vs Lazy | §6 | `BeanScopeDemo` (`OrderService`, `User`, `LazySingletonService`, `CartService`, `Main`) |
 
 ---
 
@@ -222,3 +223,135 @@ public OrderService(PaymentService paymentService) {
 SRP = reasons to change / business job — **not** “constructor must have zero parameters.”
 
 **Code refs:** class-level comments in `BeanInitializationDemo/OrderService.java` and `CircularDependencyDemo/OrderService.java`
+
+---
+
+# §6 Bean Scope — Singleton, Prototype, Eager, Lazy
+
+**Demo folder:** `Lecture 06/code/BeanScopeDemo/`  
+**Run:** `Main.java` and watch the console order of `"created"` messages.
+
+## Bean DEFINITION vs bean OBJECT (very important)
+
+| Term | Meaning |
+|------|---------|
+| **Bean definition** | The *recipe* Spring stores: class + scope + how to create it (`@Component` or `@Bean` method) |
+| **Bean object / instance** | The actual object in memory created from that recipe |
+
+So:
+
+- **Singleton** = **one definition → one shared object**
+- **Prototype** = **one definition → new object every time you ask**
+- **Two `@Bean` methods** of the same class = **two definitions → two objects** (even if both are singleton)
+
+Singleton does **NOT** mean “only one object of that Java class in the whole JVM.”  
+It means “one shared object **per bean definition** inside that Spring container.”
+
+Example in code (`AppConfig` + `CartService`):
+
+```java
+@Bean
+public CartService getCart() { return new CartService("cart-1"); }
+
+@Bean
+public CartService getCart2() { return new CartService("cart-2"); }
+```
+
+Same class, two definitions → `c1 == c2` is **false**.
+
+## Singleton scope
+
+```java
+@Component
+@Scope("singleton") // default — can omit
+public class OrderService { ... }
+```
+
+- Default scope in Spring.
+- Every `getBean(OrderService.class)` returns the **same** instance → `o1 == o2` is **true**.
+- If `A` and `B` both inject `OrderService`, they share the **same** object.
+
+```java
+OrderService o1 = context.getBean(OrderService.class);
+OrderService o2 = context.getBean(OrderService.class);
+System.out.println(o1 == o2); // true
+```
+
+**Good for:** mostly stateless services (`OrderService`, repositories, etc.)
+
+**Code:** `OrderService.java`, `A.java`, `B.java`, `Main.demoSingletonSameObject()`
+
+## Prototype scope
+
+```java
+@Component
+@Scope("prototype")
+public class User { ... }
+```
+
+- Every `getBean(User.class)` creates a **new** object → `u1 == u2` is **false**.
+- Spring does **not** create it at startup; it creates it when requested.
+
+```java
+User u1 = context.getBean(User.class);
+User u2 = context.getBean(User.class);
+System.out.println(u1 == u2); // false
+```
+
+**Good for:** stateful objects (e.g. `User` with different name/age per use)
+
+**Code:** `User.java`, `Main.demoPrototypeNewObjectEachTime()`
+
+## Eager vs Lazy — WHEN the object is created
+
+Scope (singleton/prototype) answers **how many**.  
+Eager/lazy answers **when**.
+
+| Bean | Scope | When created | Eager / Lazy |
+|------|--------|--------------|--------------|
+| `OrderService` | singleton | Context startup | **Eager** (default with `ApplicationContext`) |
+| `LazySingletonService` | singleton + `@Lazy` | First `getBean()` | **Lazy** singleton |
+| `User` | prototype | Every `getBean()` | **Lazy** (not at startup; new each time) |
+| `CartService` `@Bean`s | singleton | Context startup | **Eager** |
+
+Common mistake (fixed in your notes/code):
+
+- `@Scope("singleton")` is **not** “lazy initialization”
+- Singleton is usually **eager**
+- Use `@Lazy` if you want a lazy singleton
+
+```java
+@Component
+@Lazy
+public class LazySingletonService { ... } // still ONE object, created on first use
+```
+
+**Code:** `LazySingletonService.java`, `Main.demoLazySingleton()`
+
+## Quick revision table
+
+| Question | Singleton | Prototype |
+|----------|-----------|-----------|
+| How many objects per definition? | 1 shared | New each request |
+| `getBean` twice → `==` ? | `true` | `false` |
+| Created at context startup? | Yes (unless `@Lazy`) | No |
+| Typical use | Services | Stateful per-use objects |
+
+## Snippets to remember
+
+```java
+// Singleton — one shared object
+OrderService o1 = context.getBean(OrderService.class);
+OrderService o2 = context.getBean(OrderService.class);
+// o1 == o2 → true  (and usually created at startup)
+
+// Prototype — new object each time
+User u1 = context.getBean(User.class);
+User u2 = context.getBean(User.class);
+// u1 == u2 → false (created only when requested)
+
+// Lazy singleton — still one object, delayed creation
+LazySingletonService s1 = context.getBean(LazySingletonService.class);
+LazySingletonService s2 = context.getBean(LazySingletonService.class);
+// s1 == s2 → true
+```
